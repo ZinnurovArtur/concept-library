@@ -44,6 +44,9 @@ def index(request):
     else:
         return render(request, 'clinicalcode/index.html')
 
+def react_index(request):
+    return render(request,'index.html')
+
 
 def index_HDRUK(request):
     '''

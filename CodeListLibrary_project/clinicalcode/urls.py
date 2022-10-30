@@ -23,6 +23,7 @@ from django.views.generic.base import TemplateView
 urlpatterns = [
     url(r'^$', View.index, name='concept_library_home'),
     url(r'^home/$', View.index, name='concept_library_home2'),
+    url(r'^react/$',View.react_index, name='react'),
     url(r'^concepts/$', Concept.concept_list, name='concept_list'),
     url(r'^workingsets/$', WorkingSet.workingset_list, name='workingset_list'),
     url(r'^workingsets/select-concepts/$', SelectPhenotype.selection_list, name='selection_list'),
