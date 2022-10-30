@@ -117,7 +117,7 @@ os.environ["DJANGO_SETTINGS_MODULE"] = "cll.settings"
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.10/howto/static-files/
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'cll/static'),
+   os.path.join(BASE_DIR, 'concept-library-react/concept-library/build/static'),
 ]
 
 STATIC_URL = '/static/'
@@ -254,7 +254,7 @@ if not BROWSABLEAPI:
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'concept-library-react/concept-library/build')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
