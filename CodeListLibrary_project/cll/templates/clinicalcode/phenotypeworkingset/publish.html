@@ -1,6 +1,4 @@
-
-
-<form
+<form method="post"
   id="publish-form"  class="form-horizontal" novalidate enctype="multipart/form-data">
     {% csrf_token %}
 
@@ -32,35 +30,35 @@
             </div>
         {% endif %}
 
-        {% if not workingset_has_attributes %}
+        {% if not workingset_has_data %}
             <div class="col-md-12">
-                <span class="glyphicon glyphicon-remove" style="color:red"></span>
-                <span class="text-danger">&nbsp;The working set does not contain exportable attributes.</span>
+                <span class="glyphicon glyphicon-remove" style="color: red" ></span>
+                <span class="text-danger">&nbsp;The working set does not contain data.</span>
             </div>
 
         {% else %}
-            {% if not isAllowedtoViewChildren %}
+           {% if not is_allowed_view_children %}
                 <div class="col-md-12">
                     <span class="glyphicon glyphicon-remove" style="color:red"></span>
-                    <span class="text-danger">&nbsp;You must have view access to all concepts.</span>
+                    <span class="text-danger">&nbsp;You must have view access to all concepts/phenotypes.</span>
                 </div>
             {% endif %}
 
-            {% if not AllnotDeleted %}
+            {% if not all_not_deleted %}
                 <div class="col-md-12">
                     <span class="glyphicon glyphicon-remove" style="color:red"></span>
-                    <span class="text-danger">&nbsp;All concepts must not be deleted.</span>
+                    <span class="text-danger">&nbsp;All concepts/phenotypes must not be deleted.</span>
                 </div>
             {% endif %}
 
-            {% if not AllarePublished %}
+            {% if not all_are_published %}
                 <div class="col-md-12">
                     <span class="glyphicon glyphicon-remove" style="color:red"></span>
-                    <span class="text-danger">&nbsp;All concepts must be published.</span>
+                    <span class="text-danger">&nbsp;All concepts/phenotypes must be published.</span>
                 </div>
             {% endif %}
 
-        {% endif %}
+	 	{% endif %}
 
         {% if errors %}
             <br><br>
@@ -77,7 +75,7 @@
 
 
 
-    {% endif %}
+ 	{% endif %}
 
         <div class="row">
             <div class="col-md-12">
@@ -89,10 +87,11 @@
 <!--                            This version "{{ name }}" is already published. -->
                         {% else %}
                             {% if  approval_status == 1 and is_moderator %}
-                                 Are you sure you want to approve this version of "{{ name }}"?
+                                 Are you sure you want to approve/decline this version of "{{ name }}"?
                                  <br>
                                  Published Working Set cannot be undone.
                         <br>
+
 
                         {% else %}
 
@@ -110,8 +109,14 @@
                             {% endif %}
 
                     {% else %}
-                        {% if is_owner or is_moderator %}
+                        {% if not errors %}
+                        {% if is_owner or is_moderator  %}
+                             {% if approval_status == 3 %}
+                                 Are you sure you want to approve previously declined "{{ name }}"?
+                                 {% else %}
                         Are you sure you want to publish this version of "{{ name }}"?
+                                 {% endif %}
+
 
                         <br>
                         Published Working Set cannot be undone.
@@ -122,44 +127,32 @@
 
 
                     {% endif %}
-                    {% endif %}
-                    {% endif %}
+                            {% endif %}
 
-                </p>
+                {% endif %}
+                {% endif %}
+
             </div>
         </div>
     </div>
 
     <div class="modal-footer">
-        {% if is_published and approval_status == 2 %}
-            <span class="glyphicon glyphicon-ok" style="color:green"></span>
-            <span class="text-success">&nbsp;Published&nbsp;</span>
-        {% else %}
-        {% if approval_status == 1 and not is_moderator and is_latest_pending_version%}
-            <span class="glyphicon glyphicon-ok" style="color:green"></span>
-            <span class="text-warning">&nbsp;Waiting to approve&nbsp</span>
-            {% else %}
-            <button {% if not allowed_to_publish %} disabled="false"
-
-            {% endif %} id="publishButton" name ="submitPublish"
-                type="button" onclick = "submitForm('publish')" class="btn btn-primary">
-            {% if is_moderator %}
-                Publish
-                {% else %}
-                {% if not is_lastapproved  %}
-                Submit
-                    {% else %}
-                    Publish
-                {% endif %}
-                {% endif %}
-            {% endif %}
-            </button>
-            {% if is_moderator and approval_status == 1 and is_latest_pending_version %}
-                <button type="button" class="btn btn-primary" id = "declineButton" onclick = "submitForm('decline')" name="declinePublish">Decline
-                </button>
-                {% endif %}
+    	{% if is_published %}
+    		<span class="glyphicon glyphicon-ok" style="color:green"></span>
+		    <span class="text-success">&nbsp;Published&nbsp;</span>
+    	{% else %}
+            <button {% if not allowed_to_publish%} disabled {% endif %} id="publishButton"
+	            type="submit" class="btn btn-primary " onclick="submitForm('publish')" >
+	            Publish
+	        </button>
+            {% if approval_status == 1 %}
+                  <button {% if not allowed_to_publish %} disabled {% endif %} id="declineButton"
+	            type="submit" class="btn btn-danger " onclick="submitForm('decline')">
+	            Decline
+	        </button>
 
         {% endif %}
+    {% endif %}
 
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
     </div>
@@ -167,117 +160,104 @@
 </form>
 
 <script >
-function submitForm(status){
 
+function submitForm(value){
     // unattach the submit event
+	$('#modal-section').off('submit', '#publish-form');
 
-        var form = $('#publish-form');
+	$('#modal-section').on('submit', '#publish-form', function(e){
 
+		e.preventDefault();
 
-        //=============================================
-        // post form
+		let form = $(this);
+            value === "publish" ? doCall("{% url 'workingset_publish' pk=workingset.id workingset_history_id=workingset.history_id %}",form) : doCall("{% url 'workingset_decline' pk=workingset.id workingset_history_id=workingset.history_id %}",form)
+            });
 
-        $.ajax({
-            url:  "{% url 'phenotype_publish' pk=pk phenotype_history_id=phenotype_history_id %}",
-            data: form.serialize() + '&value='+status,
+		return false;
+}
+
+function doCall(url,form){
+    $.ajax({
+            url:  url,
+            data: form.serialize(),
             type: "POST",
             dataType: 'json',
             beforeSend: function(xhr, opts){
                 //alert('doFormSubmit= b');
                 $(".loader").show();
             },
-            success: function(data){
+			success: function(data){
+				updateHistoryTable(data,form)
+			},
+			complete: function(){
+				//alert('doFormSubmit= cc');
+				$(".loader").hide();
+			}
+		});
+}
+function updateHistoryTable(data,form){
+				if(data.form_is_valid){
+// 					$('#component-table tbody').html(data.html_component_list);
+					$('#history-table').html(data.html_history_list);
+					$('#latest-history-ID-Div').html(data.latest_history_ID);
+					$('#latest_history_id').val(data.latest_history_ID);
+// 					$('#concept-component-form-container').html(data.add_menu_items);
+					form.find('input[name=latest_history_id_shown]').val(data.latest_history_ID);
 
+					// href needs to be updated for publish concept to show latest status
+					if($('#publish2').length){
+// 						var pub_href = $('#publish2').attr("href").split("/");
+// 						pub_href[3] = data.latest_history_ID;
+// 						pub_href = pub_href.join("/")
+// 						$('#publish2').attr("href", pub_href);
 
-                if(data.form_is_valid){
-                    $('#history-table').html(data.html_history_list);
-                    $('#latest-history-ID-Div').html(data.latest_history_ID);
-                    $('#latest_history_id').val(data.latest_history_ID);
-
-                    form.find('input[name=latest_history_id_shown]').val(data.latest_history_ID);
-
-                    // href needs to be updated for publish phenotype to show latest status
-                    if(data.approval_status === 2) {
-//                      var pub_href = $('#publish2').attr("href").split("/");
-//                      pub_href[3] = data.latest_history_ID;
-//                      pub_href = pub_href.join("/")
-//                      $('#publish2').attr("href", pub_href);
-
-                        // $('#publish2').prop("disabled", true );
-                        var element = document.getElementById('publish2');
+						//$('#publish2').prop("disabled", true );
+						var element = document.getElementById('publish2');
                         element.setAttribute('disabled', 'disabled');
 
-                        $('#publish2').attr("title", "This version is already published ");
-                        $('#publish2').addClass("btn-success");
-                        $('#publish2').removeClass("btn-primary");
-                        $('#publish2').html("Published&nbsp;<span class='glyphicon glyphicon-ok' style='color:green'></span>");
-                          //alert(data.message);
-                        $('#success-message').show();
-                        $('#success-message').html(data.message);
+						$('#publish2').attr("title", "This version is already published" );
 
-                        $('#modal-section').modal('hide');
-                        $('#modal-section .modal-content').html('');
+                        if (data.approval_status === 2){
+                            $('#publish2').addClass("btn-success");
 
-                    }else {
-                        if(data.approval_status === 1){
-                            var element2 = document.getElementById('publish2');
-                        element2.setAttribute('disabled', 'disabled');
-
-                        $('#publish2').attr("title", "This version needs to be approved ");
-                        $('#publish2').addClass("btn-warning");
-                        $('#publish2').removeClass("btn-primary");
-                        $('#publish2').html("Pending");
-
-                          //alert(data.message);
-                        $('#success-message').show();
-                        $('#success-message').html(data.message);
-
-                        $('#modal-section').modal('hide');
-                        $('#modal-section .modal-content').html('');
+						$('#publish2').removeClass($('#publish2').hasClass('btn-danger') ? "btn-danger":'btn-primary');
+						$('#publish2').removeClass($('#publish2').hasClass('btn-warning') ? "btn-warning":'btn-primary');
+						
+						$('#publish2').html("Published&nbsp;<span class='glyphicon glyphicon-ok' style='color:green'></span>");
+                        }else {
+                              $('#publish2').addClass("btn-danger");
+						$('#publish2').removeClass("btn-primary");
+						$('#publish2').html("Rejected&nbsp;<span class='glyphicon glyphicon-remove' style='color:red'></span>");
                         }
-                        else {
-                            if (data.approval_status === 3) {
 
-                                var element3 = document.getElementById('publish2');
-                                element3.setAttribute('disabled', 'disabled');
 
-                                $('#publish2').attr("title", "This version is declined ");
-                                $('#publish2').addClass("btn-danger");
-                                $('#publish2').removeClass("btn-primary");
-                                $('#publish2').html("Declined");
+					}
 
-                                //alert(data.message);
-                                $('#success-message').show();
-                                $('#success-message').html(data.message);
-
-                                $('#modal-section').modal('hide');
-                                $('#modal-section .modal-content').html('');
-                            }
+					if (data.approval_status === 2){
+                        $('#success-message').show();
+					$('#success-message').html(data.message);
+                    }else {
+                        if (data.approval_status === 3){
+                            $('#error-message').show();
+					$('#error-message').html(data.message);
                         }
                     }
 
-                }
-                else{
-                    $('#error-message').show();
-                    $('#error-message').html(data.message);
 
-                    $('#modal-section').modal('hide');
-                    $('#modal-section .modal-content').html('');
-                }
-            },
-            complete: function(){
-                //alert('doFormSubmit= cc');
-                $(".loader").hide();
-            }
-        });
+					$('#modal-section').modal('hide');
+					$('#modal-section .modal-content').html('');
 
-        //=============================================
+				}
+				else{
+					$('#error-message').show();
+					$('#error-message').html(data.message);
 
-
-        return false;
-
-
+					$('#modal-section').modal('hide');
+					$('#modal-section .modal-content').html('');
+				}
 }
 
 
 </script>
+
+

@@ -26,7 +26,7 @@ urlpatterns = [
     url(r'^react/$',View.react_index, name='react'),
     url(r'^concepts/$', Concept.concept_list, name='concept_list'),
     url(r'^workingsets/$', WorkingSet.workingset_list, name='workingset_list'),
-    url(r'^workingsets/select-concepts/$', SelectPhenotype.selection_list, name='selection_list'),
+    url(r'^phenotypeworkingsets/select-concepts/$', SelectPhenotype.selection_list, name='selection_list'),
     url(r'^phenotypeworkingsets/$', PhenotypeWorkingSet.workingset_list, name='phenotypeworkingsets_list'),
     url(r'^phenotypes/$', Phenotype.phenotype_list, name='phenotype_list'),
     
@@ -56,10 +56,10 @@ urlpatterns += [
 ]
 
 # contact us page
-if not settings.CLL_READ_ONLY:
-    urlpatterns += [
-        url(r'^contact-us/$', View.contact_us, name='contact_us'),
-    ]
+#if not settings.CLL_READ_ONLY:
+urlpatterns += [
+    url(r'^contact-us/$', View.contact_us, name='contact_us'),
+]
 
 #======== robots.txt / sitemap ====================================================================
 if settings.IS_HDRUK_EXT == "1" or settings.IS_DEVELOPMENT_PC:
@@ -76,11 +76,14 @@ if not settings.CLL_READ_ONLY and (settings.IS_DEMO or settings.IS_DEVELOPMENT_P
     urlpatterns += [
         url(r'^adminTemp/api_remove_data/$', adminTemp.api_remove_data, name='api_remove_data'),
     ]
-if not settings.CLL_READ_ONLY and (settings.IS_DEVELOPMENT_PC):
+
+# for admin(developers) to mark phenotypes as deleted/restored
+if not settings.CLL_READ_ONLY:
     urlpatterns += [
-        url(r'^adminTemp/json-adjust-phenotype/$', adminTemp.json_adjust_phenotype, name='json_adjust_phenotype'),
-        url(r'^adminTemp/json-adjust-workingset/$', adminTemp.json_adjust_workingset, name='json_adjust_workingset'),
+        url(r'^adminTemp/delete-phenotype/$', adminTemp.admin_delete_phenotypes, name='admin_delete_phenotypes'),
+        url(r'^adminTemp/restore-phenotype/$', adminTemp.admin_restore_phenotypes, name='admin_restore_phenotypes'),
     ]
+
 
 # saving statistics
 if not settings.CLL_READ_ONLY:
@@ -456,18 +459,24 @@ if not settings.CLL_READ_ONLY:
     ]
 
 #======== Publish Concept =========================================================================
-if settings.ENABLE_PUBLISH:
-    urlpatterns += [
-        url(r'^concepts/C(?P<pk>\d+)/(?P<concept_history_id>\d+)/publish/$',
-            Concept.ConceptPublish.as_view(),
-            name='concept_publish'),
-        url(r'^phenotypes/(?P<pk>PH\d+)/(?P<phenotype_history_id>\d+)/publish/$',
-            Phenotype.PhenotypePublish.as_view(),
-            name='phenotype_publish'),
-        url(r'^phenotypeworkingset/(?P<pk>WS\d+)/(?P<workingset_history_id>\d+)/publish/$',
-            PhenotypeWorkingSet.WorkingSetPublish.as_view(),
-            name='workingset_publish'),
-    ]
+
+urlpatterns += [
+    url(r'^concepts/C(?P<pk>\d+)/(?P<concept_history_id>\d+)/publish/$',
+        Concept.ConceptPublish.as_view(),
+        name='concept_publish'),
+    url(r'^phenotypes/(?P<pk>PH\d+)/(?P<phenotype_history_id>\d+)/publish/$',
+        Phenotype.PhenotypePublish.as_view(),
+        name='phenotype_publish'),
+    url(r'^phenotypeworkingset/(?P<pk>WS\d+)/(?P<workingset_history_id>\d+)/publish/$',
+        PhenotypeWorkingSet.WorkingSetPublish.as_view(),
+        name='workingset_publish'),
+    url(r'^phenotypeworkingset/(?P<pk>WS\d+)/(?P<workingset_history_id>\d+)/request_publish/$',
+        PhenotypeWorkingSet.WorkingRequestPublish.as_view(),
+        name='workingset_request_publish'),
+    url(r'^phenotypeworkingset/(?P<pk>WS\d+)/(?P<workingset_history_id>\d+)/decline/$',
+        PhenotypeWorkingSet.WorkingsetDecline.as_view(),
+        name='workingset_decline')
+]
 
 # handler400 = 'clinicalcode.views.bad_request'
 # handler403 = 'clinicalcode.views.permission_denied'

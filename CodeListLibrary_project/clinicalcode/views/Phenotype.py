@@ -9,7 +9,6 @@ import logging
 import re
 import time
 from collections import OrderedDict
-from collections import OrderedDict as ordr
 from datetime import datetime
 
 from django import forms
@@ -156,10 +155,9 @@ def phenotype_list(request):
                 search_by_id = True
                 filter_cond += " AND (id ='" + str(ret_id) + "') "
     
-    # Change to collections once model + data represents parameter
-    collections, filter_cond = db_utils.apply_filter_condition(query='tags', selected=collection_ids, conditions=filter_cond)
-
+    collections, filter_cond = db_utils.apply_filter_condition(query='collections', selected=collection_ids, conditions=filter_cond)
     tags, filter_cond = db_utils.apply_filter_condition(query='tags', selected=tag_ids, conditions=filter_cond)
+    
     coding, filter_cond = db_utils.apply_filter_condition(query='clinical_terminologies', selected=coding_ids, conditions=filter_cond)
     sources, filter_cond = db_utils.apply_filter_condition(query='data_sources', selected=data_sources, conditions=filter_cond)
     selected_phenotype_types_list, filter_cond = db_utils.apply_filter_condition(query='phenotype_type', selected=selected_phenotype_types, conditions=filter_cond, data=phenotype_types_list)
@@ -373,8 +371,8 @@ def PhenotypeDetail_combined(request, pk, phenotype_history_id=None):
                             set_history_id=phenotype_history_id)
 
     if phenotype_history_id is None:
-        # get the latest version
-        phenotype_history_id = int(Phenotype.objects.get(pk=pk).history.latest().history_id)
+        # get the latest version/ or latest published version
+        phenotype_history_id = try_get_valid_history_id(request, Phenotype, pk)
 
     is_published = checkIfPublished(Phenotype, pk, phenotype_history_id)
     approval_status = get_publish_approval_status(Phenotype, pk, phenotype_history_id)
@@ -398,14 +396,19 @@ def PhenotypeDetail_combined(request, pk, phenotype_history_id=None):
 
     tags = Tag.objects.filter(pk=-1)
     phenotype_tags = phenotype['tags']
-
-    has_tags = False
-    has_collections = False
+    has_tags = False    
     if phenotype_tags:
         tags = Tag.objects.filter(pk__in=phenotype_tags)
-
         has_tags = tags.filter(tag_type=1).count() != 0
-        has_collections = tags.filter(tag_type=2).count() != 0
+
+    collections = Tag.objects.filter(pk=-1)
+    phenotype_collections = phenotype['collections']
+    has_collections = False
+    if phenotype_collections:
+        collections = Tag.objects.filter(pk__in=phenotype_collections)
+        has_collections = collections.filter(tag_type=2).count() != 0
+
+
 
     data_sources = DataSource.objects.filter(pk=-1)
     phenotype_data_sources = phenotype['data_sources']  
@@ -536,16 +539,15 @@ def PhenotypeDetail_combined(request, pk, phenotype_history_id=None):
             c['concept_friendly_id'] = 'C' + str(c['concept_id'])
             concept_data.append(c)
 
-    if phenotype['is_deleted'] == True:
-        messages.info(request, "This phenotype has been deleted.")
 
     context = {
         'phenotype': phenotype,
         'concept_informations': json.dumps(phenotype['concept_informations']),
         'tags': tags,
-        'gender': phenotype_gender,
         'has_tags': has_tags,
+        'collections': collections,
         'has_collections': has_collections,
+        'gender': phenotype_gender,        
         'data_sources': data_sources,
         'clinicalTerminologies': clinicalTerminologies,
         'user_can_edit': False,  # for now  #can_edit,
@@ -774,8 +776,8 @@ def history_phenotype_codes_to_csv(request, pk, phenotype_history_id=None):
         Return a csv file of codes for a phenotype for a specific historical version.
     """
     if phenotype_history_id is None:
-        # get the latest version
-        phenotype_history_id = Phenotype.objects.get(pk=pk).history.latest().history_id
+        # get the latest version/ or latest published version
+        phenotype_history_id = try_get_valid_history_id(request, Phenotype, pk)        
         
     # validate access for login and public site
     validate_access_to_view(request,
@@ -828,20 +830,64 @@ def history_phenotype_codes_to_csv(request, pk, phenotype_history_id=None):
         'concept_id', 'concept_version_id', 'concept_name',
         'phenotype_id', 'phenotype_version_id', 'phenotype_name'
         ])
-
-    writer.writerow(final_titles)
+    # if the phenotype contains only one concept, write titles in the loop below
+    if len(concept_ids_historyIDs) != 1:
+        final_titles = final_titles + ["code_attributes"]
+        writer.writerow(final_titles)
+        
 
     for concept in concept_ids_historyIDs:
         concept_id = concept[0]
         concept_version_id = concept[1]
-        concept_coding_system = Concept.history.get(id=concept_id, history_id=concept_version_id).coding_system.name
-        concept_name = Concept.history.get(id=concept_id, history_id=concept_version_id).name
+        current_concept_version = Concept.history.get(id=concept_id, history_id=concept_version_id)
+        concept_coding_system = current_concept_version.coding_system.name
+        concept_name = current_concept_version.name
+        code_attribute_header = current_concept_version.code_attribute_header
+        concept_history_date = current_concept_version.history_date
         
         rows_no = 0
         codes = db_utils.getGroupOfCodesByConceptId_HISTORICAL(concept_id, concept_version_id)
 
+        #---------------------------------------------
+        #  code attributes  ---
+        codes_with_attributes = []
+        if code_attribute_header:
+            codes_with_attributes = db_utils.getConceptCodes_withAttributes_HISTORICAL(concept_id=concept_id,
+                                                                                    concept_history_date=concept_history_date,
+                                                                                    allCodes=codes,
+                                                                                    code_attribute_header=code_attribute_header)
+        
+            codes = codes_with_attributes
+            
+        # if the phenotype contains only one concept
+        if len(concept_ids_historyIDs) == 1:
+            if code_attribute_header:
+                final_titles = final_titles + code_attribute_header
+                
+            writer.writerow(final_titles)
+    
+        #---------------------------------------------
+
+        
         for cc in codes:
             rows_no += 1
+                         
+            #---------------------------------------------   
+            code_attributes = []
+            # if the phenotype contains only one concept
+            if len(concept_ids_historyIDs) == 1:
+                if code_attribute_header:
+                    for a in code_attribute_header:
+                        code_attributes.append(cc[a])
+            else:
+                code_attributes_dict = OrderedDict([])
+                if code_attribute_header:
+                    for a in code_attribute_header:
+                        code_attributes_dict[a] = cc[a]
+                    code_attributes.append(dict(code_attributes_dict))
+            #---------------------------------------------
+            
+            
             writer.writerow([
                 cc['code'], 
                 cc['description'].encode('ascii', 'ignore').decode('ascii'), 
@@ -852,7 +898,7 @@ def history_phenotype_codes_to_csv(request, pk, phenotype_history_id=None):
                 current_ph_version.id, 
                 current_ph_version.history_id,
                 current_ph_version.name
-            ])
+            ] + code_attributes)
 
         if rows_no == 0:
             writer.writerow([

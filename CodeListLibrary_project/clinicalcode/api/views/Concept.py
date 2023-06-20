@@ -222,22 +222,28 @@ def export_concept_codes(request, pk):
         Return the unique set of codes and descriptions for the specified
         concept (pk).
     '''
-    # Require that the user has access to the base concept.
-    validate_access_to_view(request, Concept, pk)
-    if not (allowed_to_view_children(request, Concept, pk) and
-            chk_deleted_children(request, Concept, pk, returnErrors=False)):
-        raise PermissionDenied
-    #
+
     if request.method == 'GET':
         concept = Concept.objects.filter(id=pk).exclude(is_deleted=True)
         if concept.count() == 0: raise Http404
+        
+        # Requires that the user has access to the base concept.
+    
+        # get the latest version/ or latest published version
+        latest_history_id = try_get_valid_history_id(request, Concept, pk)
+                                                      
+        validate_access_to_view(request, Concept, pk, set_history_id=latest_history_id)
+        if not (allowed_to_view_children(request, Concept, pk) and
+                chk_deleted_children(request, Concept, pk, returnErrors=False)):
+            raise PermissionDenied
+    
 
         # Use a SQL function to extract this data.
         codes = getGroupOfCodesByConceptId(pk)
 
         #---------
         # latest concept_history_id
-        latest_history_id = Concept.objects.get(id=pk).history.latest('history_id').history_id
+        #latest_history_id = Concept.objects.get(id=pk).history.latest('history_id').history_id
         code_attribute_header = Concept.history.get(id=pk, history_id=latest_history_id).code_attribute_header
         concept_history_date = Concept.history.get(id=pk, history_id=latest_history_id).history_date
         codes_with_attributes = []
@@ -339,9 +345,6 @@ def export_concept_codes_byVersionID(request, pk, concept_history_id):
                             pk,
                             set_history_id=concept_history_id)
 
-    #     if concept_history_id is None:
-    #         # get the latest version
-    #         concept_history_id = int(Concept.objects.get(pk=pk).history.latest().history_id)
 
     #----------------------------------------------------------------------
 
@@ -515,7 +518,7 @@ def api_concept_create(request):
 
         # handling tags
         tags = request.data.get('tags')
-        is_valid_data, err, ret_value = chk_tags(request.data.get('tags'))
+        is_valid_data, err, ret_value = chk_tags(request.data.get('tags'), type='tags')
         if is_valid_data:
             tags = ret_value
             if tags:
@@ -523,6 +526,16 @@ def api_concept_create(request):
         else:
             errors_dict['tags'] = err
 
+        # handling collections
+        collections = request.data.get('collections')
+        is_valid_data, err, ret_value = chk_tags(request.data.get('collections'), type='collections')
+        if is_valid_data:
+            collections = ret_value
+            if collections:
+                new_concept.collections = [int(i) for i in collections]
+        else:
+            errors_dict['collections'] = err
+            
         #-----------------------------------------------------------
         is_valid_components = False
         is_valid_data, err, ret_value = chk_components_and_codes(request.data.get('components'))
@@ -736,7 +749,7 @@ def api_concept_update(request):
 
         # handling tags
         tags = request.data.get('tags')
-        is_valid_data, err, ret_value = chk_tags(request.data.get('tags'))
+        is_valid_data, err, ret_value = chk_tags(request.data.get('tags'), type='tags')
         if is_valid_data:
             tags = ret_value
             if tags:
@@ -745,6 +758,19 @@ def api_concept_update(request):
                 update_concept.tags = None
         else:
             errors_dict['tags'] = err
+
+        # handling collections
+        collections = request.data.get('collections')
+        is_valid_data, err, ret_value = chk_tags(request.data.get('collections'), type='collections')
+        if is_valid_data:
+            collections = ret_value
+            if collections:
+                update_concept.collections = [int(i) for i in collections]
+            else:
+                update_concept.collections = None
+        else:
+            errors_dict['collections'] = err
+
 
         #-----------------------------------------------------------
         is_valid_components = False
@@ -905,10 +931,10 @@ def user_concepts(request, pk=None):
     User can search with criteria using a combinations of querystring parameters:  
     -   <code>?search=Alcohol</code>  
     search by part of concept name (do not put wild characters here)  
-    -  <code>?tag_collection_ids=11,4</code>  
-    You can specify tag and collection ids   
-    -  <code>?collection_ids=18&tag_ids=1</code>  
-    Or you can query tags and/or collections individually   
+    -  <code>?collection_ids=20,23</code>  
+    You can specify collection ids   
+    -  <code>?tag_ids=1,3</code>  
+    You can query tags ids    
     -   <code>?show_only_my_concepts=1</code>  
     Only show concepts owned by me  
     -   <code>?show_deleted_concepts=1</code>  
@@ -939,9 +965,6 @@ def getConcepts(request, is_authenticated_user=True, pk=None, set_class=Concept)
         concept_id = pk
     else:
         concept_id = request.query_params.get('id', None)
-
-    # Once data & models reflect tag/collection split, remove the following:
-    tag_collection_ids = request.query_params.get('tag_collection_ids', '')
 
     tag_ids = request.query_params.get('tag_ids', '')
     collection_ids = request.query_params.get('collection_ids', '')
@@ -995,11 +1018,9 @@ def getConcepts(request, is_authenticated_user=True, pk=None, set_class=Concept)
                 filter_cond += " AND (id =" + str(ret_int_id) + " ) "
             
             
-    if tag_collection_ids != '':
-        tags, filter_cond = apply_filter_condition(query='tags', selected=tag_collection_ids, conditions=filter_cond)
-    else:
-        tags, filter_cond = apply_filter_condition(query='tags', selected=tag_ids, conditions=filter_cond)
-        collections, filter_cond = apply_filter_condition(query='tags', selected=collection_ids, conditions=filter_cond)
+
+    tags, filter_cond = apply_filter_condition(query='tags', selected=tag_ids, conditions=filter_cond)
+    collections, filter_cond = apply_filter_condition(query='collections', selected=collection_ids, conditions=filter_cond)
         
     coding, filter_cond = apply_filter_condition(query='coding_system_id', selected=coding_ids, conditions=filter_cond)
     
@@ -1044,7 +1065,7 @@ def getConcepts(request, is_authenticated_user=True, pk=None, set_class=Concept)
 
     if concept_id is not None:
         if concept_id != '':
-            filter_cond += " AND id=" + concept_id
+            filter_cond += " AND id=" + concept_id.upper().replace('C', '')
 
     if owner is not None:
         if owner != '':
@@ -1118,15 +1139,18 @@ def getConcepts(request, is_authenticated_user=True, pk=None, set_class=Concept)
         ret += [c['deleted'], c['published']]
 
         c_tags = []
-        c_collections = []
         concept_tags = c['tags']
         if concept_tags:
             c_tags = list(Tag.objects.filter(pk__in=concept_tags, tag_type=1).values('description', 'id'))
-            c_collections = list(Tag.objects.filter(pk__in=concept_tags, tag_type=2).values('description', 'id',  'collection_brand'))
+           
+        c_collections = []
+        concept_collections = c['collections']
+        if concept_collections:
+            c_collections = list(Tag.objects.filter(pk__in=concept_collections, tag_type=2).values('description', 'id',  'collection_brand'))
             if c_collections:
                 for col in c_collections:
                     col['collection_brand'] = Brand.objects.get(pk=col['collection_brand']).name
-                    
+
         ret += [c_tags]
         ret += [c_collections]
         
@@ -1161,6 +1185,10 @@ def concept_detail(request,
         concept_ver = Concept.history.filter(id=pk, history_id=concept_history_id)
         if concept_ver.count() == 0: raise Http404
 
+    if concept_history_id is None:
+        # get the latest version/ or latest published version
+        concept_history_id = try_get_valid_history_id(request, Concept, pk)
+        
     # validate access concept
     if not allowed_to_view(request, Concept, pk, set_history_id=concept_history_id):
         raise PermissionDenied
@@ -1177,9 +1205,6 @@ def concept_detail(request,
         raise PermissionDenied
     #---------------------------------------------------------
 
-    if concept_history_id is None:
-        # get the latest version
-        concept_history_id = Concept.objects.get(pk=pk).history.latest().history_id
 
     return getConceptDetail(request,
                             pk = pk,
@@ -1210,8 +1235,8 @@ def concept_detail_PUBLIC(request,
         if concept_ver.count() == 0: raise Http404
 
     if concept_history_id is None:
-        # get the latest version
-        concept_history_id = Concept.objects.get(pk=pk).history.latest().history_id
+        # get the latest version/ or latest published version
+        concept_history_id = try_get_valid_history_id(request, Concept, pk)
 
     is_published = checkIfPublished(Concept, pk, concept_history_id)
     # check if the concept version is published
@@ -1259,14 +1284,17 @@ def getConceptDetail(request,
     components = getHistoryComponents(pk, concept_history_date)
 
     tags = []
-    collections = []
     concept_tags = concept['tags']
     if concept_tags:
         tags = list(Tag.objects.filter(pk__in=concept_tags, tag_type=1).values('description', 'id'))
-        collections = list(Tag.objects.filter(pk__in=concept_tags, tag_type=2).values('description', 'id',  'collection_brand'))
+                
+    collections = []
+    concept_collections = concept['collections']
+    if concept_collections:
+        collections = list(Tag.objects.filter(pk__in=concept_collections, tag_type=2).values('description', 'id',  'collection_brand'))
         if collections:
             for col in collections:
-                col['collection_brand'] = Brand.objects.get(pk=col['collection_brand']).name
+                col['collection_brand'] = Brand.objects.get(pk=col['collection_brand']).name                
                     
     rows_to_return = []
     titles = [

@@ -122,6 +122,9 @@ def about_pages(request, pg_name=None):
         elif pg_name.lower() == "bhf_data_science_centre".lower():
             return render(request, 'clinicalcode/brand/HDRUK/collections/bhf-data-science-centre.html', {})
 
+        elif pg_name.lower() == "eurolinkcat".lower():
+            return render(request, 'clinicalcode/brand/HDRUK/collections/eurolinkcat.html', {})
+
 #     else:
 #         return render(request, 'clinicalcode/index.html', {})
 
@@ -306,16 +309,19 @@ def customRoot(request):
         'tags':  reverse('api:tag_list_public'),
         'collections':  reverse('api:collection_list_public'),
         'datasource-list':  reverse('api:datasource-list'),
-
-        'phenotypeworkingset_by_id': reverse('api:api_phenotypeworkingset_by_id', kwargs={'pk': 'WS0'}),
-        'api_phenotypeworkingset_detail': reverse('api:api_phenotypeworkingset_detail', kwargs={'pk': 'WS0'}),
-        'api_phenotypeworkingset_detail_version': reverse('api:api_phenotypeworkingset_detail_version', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
-        'get_phenotypeworkingset_versions': reverse('api:get_phenotypeworkingset_versions', kwargs={'pk': 'WS0'}),
-        'api_export_phenotypeworkingset_codes_latestVersion': reverse('api:api_export_phenotypeworkingset_codes_latestVersion', kwargs={'pk': 'WS0'}),
-        'api_export_phenotypeworkingset_codes_byVersionID': reverse('api:api_export_phenotypeworkingset_codes_byVersionID', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
-        'api_export_published_phenotypeworkingset_codes_latestVersion': reverse('api:api_export_published_phenotypeworkingset_codes_latestVersion', kwargs={'pk': 'WS0'}),
-        'api_export_published_phenotypeworkingset_codes': reverse('api:api_export_published_phenotypeworkingset_codes', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
     }
+    
+    if settings.IS_DEMO or settings.IS_DEVELOPMENT_PC:
+        urls_available.update({
+            'phenotypeworkingset_by_id': reverse('api:api_phenotypeworkingset_by_id', kwargs={'pk': 'WS0'}),
+            'api_phenotypeworkingset_detail': reverse('api:api_phenotypeworkingset_detail', kwargs={'pk': 'WS0'}),
+            'api_phenotypeworkingset_detail_version': reverse('api:api_phenotypeworkingset_detail_version', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
+            'get_phenotypeworkingset_versions': reverse('api:get_phenotypeworkingset_versions', kwargs={'pk': 'WS0'}),
+            'api_export_phenotypeworkingset_codes_latestVersion': reverse('api:api_export_phenotypeworkingset_codes_latestVersion', kwargs={'pk': 'WS0'}),
+            'api_export_phenotypeworkingset_codes_byVersionID': reverse('api:api_export_phenotypeworkingset_codes_byVersionID', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
+            'api_export_published_phenotypeworkingset_codes_latestVersion': reverse('api:api_export_published_phenotypeworkingset_codes_latestVersion', kwargs={'pk': 'WS0'}),
+            'api_export_published_phenotypeworkingset_codes': reverse('api:api_export_published_phenotypeworkingset_codes', kwargs={'pk': 'WS0', 'workingset_history_id': 123}),
+        })
 
     if not settings.CLL_READ_ONLY:
         urls_available.update({

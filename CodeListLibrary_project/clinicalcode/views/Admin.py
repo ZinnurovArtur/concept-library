@@ -145,9 +145,9 @@ def run_datasource_sync(request):
             'clinicalcode/admin/run_datasource_sync.html', 
             message
         )
-
+        
+        
 def run_statistics(request):
-
     """
         save HDR-UK home page statistics
     """
@@ -212,8 +212,7 @@ def get_HDRUK_statistics(request):
     #--------------------------
 
     HDRUK_published_phenotypes = db_utils.get_visible_live_or_published_phenotype_versions(request,
-                                                                                            get_live_and_or_published_ver=
-                                                                                            2,  # 1= live only, 2= published only, 3= live+published
+                                                                                            get_live_and_or_published_ver=2,  # 1= live only, 2= published only, 3= live+published
                                                                                             exclude_deleted=True,
                                                                                             show_top_version_only=False,
                                                                                             force_brand='HDRUK',
@@ -419,7 +418,7 @@ def get_caliberresearch_url_source(request):
     response['Content-Disposition'] = 'attachment; filename="HDRUK_caliberresearch_url_source.csv"'
     writer = csv.writer(response)
 
-    titles = ['Phenotype_id', 'collections_tags', 'portal.caliberresearch.org', 'is_Caliber' , 'phenotypes.healthdatagateway.org']
+    titles = ['Phenotype_id', 'collections', 'portal.caliberresearch.org', 'is_Caliber' , 'phenotypes.healthdatagateway.org']
     writer.writerow(titles)
 
 
@@ -442,7 +441,7 @@ def get_caliberresearch_url_source(request):
             
         writer.writerow([
                         p.id,
-                        list(tags.filter(id__in=p.tags).values_list('description', flat=True)),
+                        list(tags.filter(id__in=p.collections).values_list('description', flat=True)),
                         p.source_reference, 
                         is_Caliber,
                         redirect_url
@@ -594,7 +593,9 @@ def get_brand_filter_stat(request, entity_class, force_brand=None):
         
         if i['tags'] is not None:
             tag_list = tag_list + i['tags']
-            collection_list = collection_list + i['tags']
+        
+        if i['collections'] is not None:
+            collection_list = collection_list + i['collections']
             
         if entity_class == Concept:
             if i['coding_system_id'] is not None:
@@ -614,7 +615,9 @@ def get_brand_filter_stat(request, entity_class, force_brand=None):
 
         if i['tags'] is not None:
             tag_list_published = tag_list_published + i['tags']
-            collection_list_published = collection_list_published + i['tags']
+            
+        if i['collections'] is not None:
+            collection_list_published = collection_list_published + i['collections']
             
         if entity_class == Concept:
             if i['coding_system_id'] is not None:

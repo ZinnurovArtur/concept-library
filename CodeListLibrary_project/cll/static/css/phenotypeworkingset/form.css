@@ -19,8 +19,48 @@
     margin-bottom: 10px;
 }
 
+.ws-trash {
+    padding: 6px 12px;
+    height: 35px;
+    margin-left: 10px;
+}
+
+.ws-trash-pub {
+    margin-left: -6px;
+    padding: 6px 12px;
+    margin-top: 20px;
+    height: 35px;
+}
+
+.ws-upload {
+    margin-left: 3px;
+}
+#workingset-tag-form{
+    margin-top: 20px;
+}
+#workingset-owned-form{
+    margin-top: 20px;
+}
+
+#workingset-group-form{
+    margin-top: 20px;
+}
+
+
+table.dataTable tbody td.selected a {
+    color: white;
+}
+
+.data-row {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: 290px;
+    white-space: pre-line;
+    margin-top: 7px
+}
 
 .material-textfield {
+    margin-top: 20px;
     position: relative;
 }
 
@@ -50,7 +90,7 @@
 }
 
 .bootstrap-tagsinput {
-     font-size: 14px;
+    font-size: 14px;
     outline: none;
     border: 1px solid #8499d6;
     border-radius: 5px;
@@ -60,16 +100,14 @@
 
 }
 
-.table-button{
-    margin-top: 17px;
+.table-button {
+    margin-top: 20px;
     height: 35px;
     background-image: none;
 }
 
 
-
 .form-control {
-    margin-bottom: 8px;
     height: 35px;
 }
 
@@ -83,8 +121,6 @@
     top: 0;
     transform: translateY(-50%) scale(.9);
 }
-
-
 
 
 .input-material:not(:placeholder-shown) + .label-material {
@@ -113,20 +149,38 @@
     color: #9b9191;
     z-index: 1;
     background-color: transparent;
-
 }
 
 
+
 .form-control[disabled], .form-control[readonly], fieldset[disabled] .label-select::before {
-    border-top: 3px;
+
     content: "";
-    margin: 0 auto; /* this centers the line to the full width specified */
-    position: absolute; /* positioning must be absolute here, and relative positioning must be applied to the parent */
+    position: inherit;
     top: 50%;
     left: 0;
     right: 0;
     bottom: 0;
-    width: 95%;
+
+    background-color: #eee;
+
+    z-index: -1;
+}
+
+.form-control[disabled], .form-control[readonly], fieldset[disabled] .input-material {
+    color: #9b9191;
+    z-index: 1;
+}
+
+
+
+.form-control[disabled], .form-control[readonly], fieldset[disabled] .input-material::before {
+
+
+    top: 50%;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background-color: #eee;
     z-index: -1;
 }
@@ -160,7 +214,7 @@
     box-sizing: border-box;
     cursor: pointer;
     display: inline-block;
-    height:30px
+    height: 30px
 }
 
 
@@ -168,6 +222,13 @@
     background: #2b6cb0;
 }
 
+.form-label-flex{
+    display: flex;
+    align-items: center;
+    padding-left: 15px;
+
+
+}
 .save-button {
     padding: 2px 37px;
     color: #ffffff;
@@ -186,12 +247,17 @@
     box-sizing: border-box;
     cursor: pointer;
     display: inline-block;
-    height:30px
+    height: 30px
 }
-.publication-button{
+
+.publication-button {
     color: #ffffff;
     background: #4285f4;
+    padding: 7px 12px;
+    height: 35px;
+    margin-left: -6px;
     position: relative;
+    margin-top: 20px;
     text-align: center;
     text-decoration: none;
     transition: color 100ms;

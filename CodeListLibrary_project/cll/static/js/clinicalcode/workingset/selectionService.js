@@ -174,6 +174,7 @@ var SelectionService = function (element, methods, previouslySelected = []) {
   this.filter_order = undefined;
   this.element = element[0];
   this.selected = previouslySelected;
+  this.onOpen = methods.onOpen || (() => { });
   this.onImport = methods.onImport || (() => { });
   this.onClose = methods.onClose || (() => { });
   this.modal = null;
@@ -1033,7 +1034,7 @@ var SelectionService = function (element, methods, previouslySelected = []) {
               Clear Selected
             </a>
             <a class="btn btn-outline-primary btn-cl btn-cl-secondary" id="import-concepts">
-              Import Concepts
+              Apply changes
             </a>
           </div>
         </div>
@@ -1064,7 +1065,7 @@ var SelectionService = function (element, methods, previouslySelected = []) {
   
     var getResults = new Promise((resolve, reject) => {
       $.ajax({
-        url: '/workingsets/select-concepts/',
+        url: '/phenotypeworkingsets/select-concepts/',
         type: 'GET',
         data: Object.assign(values, {method: 1}),
         dataType: 'html',
@@ -1147,6 +1148,9 @@ var SelectionService = function (element, methods, previouslySelected = []) {
    *************************************/
   $(this.element).on('click', (e) => {
     e.preventDefault();
+
+    // Handle method
+    this.onOpen(this, e);
 
     // Initialise modal
     this.modal = createSelectionModal();

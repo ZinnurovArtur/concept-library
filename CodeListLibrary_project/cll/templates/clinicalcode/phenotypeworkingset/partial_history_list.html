@@ -15,9 +15,7 @@
 				<th>Date</th>
 				<th>Change reason</th>
 				<th>User</th>
-				{% if enable_publish %}
-					<th>Is Published?</th>
-				{% endif %}
+				<th>Is Published?</th>
 			{% else %}
 				<th>Owner</th>
 				<th>Publish date</th>
@@ -30,7 +28,8 @@
 		<tr>
 			<td>{{ history.history_id }}</td>
 			<td>
-				<a class="" href="{% url 'phenotypeworkingset_history_detail' pk=workingset.id workingset_history_id=workingset.history_id %}">	
+
+				<a class="" href="{% url 'phenotypeworkingset_history_detail' pk=history.id workingset_history_id=history.history_id %}">
 				{% if history.name_highlighted|length %}
 					{{ history.name_highlighted|safe }}
 				{% else %}
@@ -48,7 +47,6 @@
 						{{ history.created_by }}
 					{% endif %}
 				</td>
-				{% if enable_publish %}
 				<td classXX="text-center">
 					{% if history.history_id in published_historical_ids%}
 						<span>&#10004;</span>
@@ -56,7 +54,6 @@
 						{{ history.approval_status_label }}
 					{% endif %}
 				</td>
-				{% endif %}
 			{% else %}
 				<td>{{ history.owner }}</td>
 				<td>{{ history.publish_date|date:"Y-m-d" }}</td>

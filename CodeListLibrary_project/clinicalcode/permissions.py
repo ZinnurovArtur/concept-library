@@ -12,6 +12,17 @@ from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from dataclasses import replace
+from enum import Enum
+
+class PERM_ERROR_TEMPLATES(str, Enum):
+    """
+        Used to raise custom error messages via 403.html
+        Can be used by calling the 'raise PermissionDenied' command with the enum's value as a param
+            e.g. raise PermissionDenied(PERM_ERROR_TEMPLATES.INVALID_ACCESS.value)
+        @enum, 'INVALID_ACCESS' - validate_access_to_view method has failed because the request user does not have permission to access the requested content
+        @enum, ...other messages
+    """
+    INVALID_ACCESS = 'ERR_403_PERM'
 
 
 class Permissions:
@@ -21,6 +32,33 @@ class Permissions:
     PERMISSION_CHOICES = ((NONE, 'No Access'), (VIEW, 'View'), (EDIT, 'Edit'))
 
     PERMISSION_CHOICES_WORLD_ACCESS = ((NONE, 'No Access'), (VIEW, 'View'))
+
+
+def try_get_valid_history_id(request, set_class, set_id):
+    """
+        Tries to resolve a valid history id for an entity query.
+        If the entity is accessible (i.e. validate_access_to_view() is TRUE), 
+        then return the most recent version if the user is authenticated,      
+        Otherwise, this method will return the most recently published version, if available.
+        @param request, the request
+        @param set_class, a model
+        @param set_id, the id of the entity
+        @returns int, a history_id
+    """
+    is_authenticated = request.user.is_authenticated
+    set_history_id = None
+    
+    if is_authenticated:                   
+        # get the latest version
+        set_history_id = int(set_class.objects.get(pk=set_id).history.latest().history_id)
+
+    else:  # public content
+        # get the latest published version
+        latest_published_version_id = get_latest_published_version(set_class, set_id)
+        if latest_published_version_id:
+            set_history_id = latest_published_version_id
+
+    return set_history_id
 
 
 
@@ -42,6 +80,36 @@ def checkIfPublished(set_class, set_id, set_history_id):
         return PublishedWorkingset.objects.filter(workingset_id=set_id, workingset_history_id=set_history_id, approval_status=2).exists()
     else:
         return False
+
+
+def get_latest_published_version(set_class, set_id):
+    ''' get latest published version '''
+
+    from .models.Concept import Concept
+    from .models.Phenotype import Phenotype
+    from .models.PhenotypeWorkingset import PhenotypeWorkingset
+    from .models.PublishedConcept import PublishedConcept
+    from .models.PublishedPhenotype import PublishedPhenotype
+    from .models.PublishedWorkingset import PublishedWorkingset
+
+    latest_published_version = None 
+    
+    if (set_class == Concept):
+        latest_published_version = PublishedConcept.objects.filter(concept_id=set_id).order_by('-concept_history_id').first()
+        if latest_published_version:
+            return latest_published_version.concept_history_id
+    elif (set_class == Phenotype):
+        latest_published_version = PublishedPhenotype.objects.filter(phenotype_id=set_id, approval_status=2).order_by('-phenotype_history_id').first()
+        if latest_published_version:
+            return latest_published_version.phenotype_history_id        
+    elif (set_class == PhenotypeWorkingset):
+        latest_published_version = PublishedWorkingset.objects.filter(workingset_id=set_id, approval_status=2).order_by('-workingset_history_id').first() 
+        if latest_published_version:
+            return latest_published_version.workingset_history_id            
+    else:
+        return None
+
+    return None
 
 
 def get_publish_approval_status(set_class, set_id, set_history_id):
@@ -299,12 +367,24 @@ def allowed_to_view(request,
                 approval_status = get_publish_approval_status(set_class, set_id, set_history_id)
                 if approval_status in [1, 3]: # pending or rejected
                     is_allowed_to_view = True
+                    
+            # check if the version is published
+            if set_history_id is None:
+                # get the latest version
+                set_history_id = int(set_class.objects.get(pk=set_id).history.latest().history_id)
+    
+            is_published = checkIfPublished(set_class, set_id, set_history_id)
+    
+            if is_published:
+                is_allowed_to_view = True
 
     else:  # public content
         # check if the version is published
         if set_history_id is None:
-            # get the latest version
-            set_history_id = int(set_class.objects.get(pk=set_id).history.latest().history_id)
+            # get the latest published version
+            latest_published_version_id = get_latest_published_version(set_class, set_id)
+            if latest_published_version_id:
+                set_history_id = latest_published_version_id
 
         is_published = checkIfPublished(set_class, set_id, set_history_id)
 
@@ -433,7 +513,6 @@ def validate_access_to_view(request, set_class, set_id, set_history_id=None):
     '''
     if allowed_to_view(request, set_class, set_id, set_history_id=set_history_id) == False:
         raise PermissionDenied
-
 
 def validate_access_to_edit(request, set_class, set_id):
     '''
@@ -603,6 +682,46 @@ class HasAccessToViewWorkingsetCheckMixin(object):
             return self.access_to_view_workingset_failed(request, *args, **kwargs)
 
         return super(HasAccessToViewWorkingsetCheckMixin, self).dispatch(request, *args, **kwargs)
+
+
+class HasAccessToEditPhenotypeWorkingsetCheckMixin(object):
+    '''
+        mixin to check if user has edit access to a working set
+        this mixin is used within class based views and can be overridden
+    '''
+
+    def has_access_to_edit_workingset(self, user, workingset_id):
+        from .models.PhenotypeWorkingset import PhenotypeWorkingset
+        return allowed_to_edit(self.request, PhenotypeWorkingset, workingset_id)
+
+    def access_to_edit_workingset_failed(self, request, *args, **kwargs):
+        raise PermissionDenied
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.has_access_to_edit_workingset(request.user,self.kwargs['pk']):
+            return self.access_to_edit_workingset_failed(request, *args, **kwargs)
+
+        return super(HasAccessToEditPhenotypeWorkingsetCheckMixin, self).dispatch(request, *args, **kwargs)
+
+
+class HasAccessToViewPhenotypeWorkingsetCheckMixin(object):
+    '''
+        mixin to check if user has view access to a working set
+        this mixin is used within class based views and can be overridden
+    '''
+
+    def has_access_to_view_workingset(self, user, workingset_id):
+        from .models.PhenotypeWorkingset import PhenotypeWorkingset
+        return allowed_to_view(self.request, PhenotypeWorkingset, workingset_id)
+
+    def access_to_view_workingset_failed(self, request, *args, **kwargs):
+        raise PermissionDenied
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.has_access_to_view_workingset(request.user, self.kwargs['pk']):
+            return self.access_to_view_workingset_failed(request, *args, **kwargs)
+
+        return super(HasAccessToViewPhenotypeWorkingsetCheckMixin, self).dispatch(request, *args, **kwargs)
 
 
 class HasAccessToEditPhenotypeCheckMixin(object):
@@ -929,10 +1048,7 @@ def is_brand_accessible(request, set_class, set_id, set_history_id=None):
                 history_id = set_class.objects.get(pk=set_id).history.latest().history_id
 
             set_collections = []
-            if set_class in (Concept, Phenotype):
-                set_collections = set_class.history.get(id=set_id, history_id=history_id).tags
-
-            elif set_class == PhenotypeWorkingset:
+            if set_class in (Concept, Phenotype, PhenotypeWorkingset):
                 set_collections = set_class.history.get(id=set_id, history_id=history_id).collections
                 
             elif set_class == WorkingSet:

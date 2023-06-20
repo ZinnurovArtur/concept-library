@@ -15,14 +15,14 @@ from .TimeStampedModel import TimeStampedModel
 
 
 class PhenotypeWorkingset(TimeStampedModel):
-    id = models.CharField(primary_key=True, editable=False, max_length=50)
+    id = models.CharField(primary_key=True, editable=False, default=None,max_length=50)
     name = models.CharField(max_length=250)
     type = models.IntegerField(choices=Type_status,null=True,blank=True,default = 0)  # restricted type of the working_set(constants)
     tags = ArrayField(models.IntegerField(), blank=True, null=True)  # tags of brands
     collections = ArrayField(models.IntegerField(), blank=True, null=True)  # collection of branded workingsets
     publications = ArrayField(models.CharField(max_length=500), blank=True, null=True)
     author = models.CharField(max_length=250)
-    citation_requirements = models.CharField(max_length=250)  # Any request for citation requirements to be honoured
+    citation_requirements = models.TextField(null=True, blank=True)  # Any request for citation requirements to be honoured
     description = models.TextField(null=True, blank=True)
     data_sources = ArrayField(models.IntegerField(), blank=True, null=True)  # Easy access to data sources
 

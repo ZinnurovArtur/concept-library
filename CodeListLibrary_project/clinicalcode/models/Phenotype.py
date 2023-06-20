@@ -1,3 +1,4 @@
+import datetime
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import JSONField
@@ -38,7 +39,7 @@ class Phenotype(TimeStampedModel):
     secondary_publication_links = models.TextField(null=True, blank=True)
     implementation = models.TextField(null=True, blank=True)
     source_reference = models.CharField(max_length=250)  # Was this code list from another source?  Reference here.
-    citation_requirements = models.CharField(max_length=250)  # Any request for citation requirements to be honoured
+    citation_requirements = models.TextField(null=True, blank=True)  # Any request for citation requirements to be honoured
 
     phenoflowid = models.CharField(max_length=100, null=True, blank=True)  # ID to link to PhenoFlow
 
@@ -55,21 +56,28 @@ class Phenotype(TimeStampedModel):
     group_access = models.IntegerField(choices=Permissions.PERMISSION_CHOICES, default=Permissions.NONE)
     world_access = models.IntegerField(choices=Permissions.PERMISSION_CHOICES, default=Permissions.NONE)
 
-    tags = ArrayField(models.IntegerField(), blank=True, null=True)  #default=list
+    tags = ArrayField(models.IntegerField(), blank=True, null=True) 
+    collections = ArrayField(models.IntegerField(), blank=True, null=True) 
     clinical_terminologies = ArrayField(models.IntegerField(), blank=True, null=True)  # coding systems
     publications = ArrayField(models.CharField(max_length=500), blank=True, null=True)
 
-    data_sources = ArrayField(models.IntegerField(), blank=True, null=True)  #default=list
+    data_sources = ArrayField(models.IntegerField(), blank=True, null=True) 
 
     history = HistoricalRecords()
 
 
     def save(self, *args, **kwargs):
-        count = Phenotype.objects.count()
-        if count:
-            count += 35   # we needed offset here because count != last int id
+        count = Phenotype.objects.extra(
+            select={
+                'true_id': '''CAST(SUBSTRING(id, 3, LENGTH(id)) AS INTEGER)'''
+            }
+        ).order_by('-true_id', 'id').first()
+
+        if count and count.true_id:
+            count = count.true_id + 1
         else:
             count = 1
+
         if not self.id:
             self.id = "PH" + str(count)
 
